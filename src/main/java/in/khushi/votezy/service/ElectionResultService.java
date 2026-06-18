@@ -1,7 +1,6 @@
 package in.khushi.votezy.service;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -18,10 +17,10 @@ import in.khushi.votezy.repository.VoteRepository;
 @Service
 public class ElectionResultService {
 
-    private CandidateRepository candidateRepository;
-    private ElectionResultRepository electionResultRepository;
-    private VoteRepository voteRepository;
-    private ElectionRepository electionRepository;
+    private final CandidateRepository candidateRepository;
+    private final ElectionResultRepository electionResultRepository;
+    private final VoteRepository voteRepository;
+    private final ElectionRepository electionRepository;
 
     @Autowired
     public ElectionResultService(
@@ -41,50 +40,37 @@ public class ElectionResultService {
         Election election = electionRepository
                 .findByElectionName(electionName)
                 .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Election not found"));
+                        new ResourceNotFoundException("Election not found"));
 
-        Optional<ElectionResult> existingResult =
-                electionResultRepository
-                        .findByElection_Id(
-                                election.getId());
-
-        if (existingResult.isPresent()) {
-            return existingResult.get();
-        }
-
-        long voteCount =
+        long totalVotes =
                 voteRepository.countByElection_Id(
                         election.getId());
 
-        if (voteCount == 0) {
+        if (totalVotes == 0) {
             throw new IllegalStateException(
                     "No votes cast for this election");
         }
 
-        List<Candidate> allCandidates =
+        List<Candidate> candidates =
                 candidateRepository
                         .findByElectionIdOrderByVoteCountDesc(
                                 election.getId());
 
-        if (allCandidates.isEmpty()) {
+        if (candidates.isEmpty()) {
             throw new ResourceNotFoundException(
                     "No candidates available");
         }
 
-        Candidate winner = allCandidates.get(0);
+        Candidate winner = candidates.get(0);
 
-        int totalVotes = 0;
-
-        for (Candidate candidate : allCandidates) {
-            totalVotes += candidate.getVoteCount();
-        }
-
-        ElectionResult result = new ElectionResult();
+        ElectionResult result =
+                electionResultRepository
+                        .findByElection_Id(election.getId())
+                        .orElse(new ElectionResult());
 
         result.setElection(election);
         result.setWinner(winner);
-        result.setTotalVotes(totalVotes);
+        result.setTotalVotes((int) totalVotes);
 
         return electionResultRepository.save(result);
     }
